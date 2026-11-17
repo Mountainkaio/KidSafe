@@ -1,0 +1,36 @@
+{
+	"manifest_version": 3,
+	"name": "KidSafe",
+	"version": "0.1.0",
+	"description": "Ajuda responsáveis a proteger a navegação de crianças e adolescentes.",
+	"permissions": [
+		"storage",
+		"alarms",
+		"tabs",
+		"webNavigation",
+		"declarativeNetRequest"
+	],
+	"host_permissions": ["<all_urls>"],
+	"background": {
+		"service_worker": "background.js",
+		"type": "module"
+	},
+	"action": {
+		"default_popup": "popup.html",
+		"default_title": "KidSafe"
+	},
+	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["content.js"],
+			"run_at": "document_start",
+			"all_frames": false
+		}
+	],
+	"web_accessible_resources": [
+		{
+			"resources": ["blocked.html"],
+			"matches": ["<all_urls>"]
+		}
+	]
+}

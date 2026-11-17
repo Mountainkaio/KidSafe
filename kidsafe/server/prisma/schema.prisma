@@ -1,0 +1,98 @@
+generator client {
+	provider = "prisma-client-js"
+}
+
+datasource db {
+	provider = "sqlite"
+	url      = env("DATABASE_URL")
+}
+
+// Por enquanto, só o responsável tem login próprio no sistema web.
+// O usuário monitorado (criança/adolescente) não loga: ele é
+// representado pelo Device vinculado à conta do responsável.
+// Obs: SQLite não suporta enum no Prisma, por isso campos como
+// "role" e "status" são String.
+model User {
+	id        Int      @id @default(autoincrement())
+	name      String
+	email     String   @unique
+	password  String
+	role      String   @default("RESPONSAVEL")
+	status    String   @default("ACTIVE") // ACTIVE | SUSPENDED
+	createdAt DateTime @default(now())
+	devices   Device[]
+}
+
+// Representa o dispositivo/navegador onde a extensão está instalada.
+// "pairingCode" é gerado pela extensão e usado uma vez pelo responsável
+// para vincular o dispositivo à sua conta. "deviceToken" é o segredo
+// que a extensão usa depois disso para se autenticar na API.
+model Device {
+	id              Int       @id @default(autoincrement())
+	name            String    @default("Dispositivo")
+	pairingCode     String    @unique
+	deviceToken     String    @unique
+	status          String    @default("PENDING") // PENDING | LINKED
+	userId          Int?
+	user            User?     @relation(fields: [userId], references: [id])
+	extensionEnabled Boolean  @default(true) // "pausar extensão" do painel
+	lockScreen      Boolean   @default(false)
+	scheduleStart   String? // ex: "10:00"
+	scheduleEnd     String? // ex: "22:00"
+	scheduleDays    String? // ex: "1,2,3,4,5" (0 = domingo)
+	scheduledBreaks      Boolean   @default(false)
+	breakUsageMinutes    Int       @default(15) // período de uso antes da pausa (minutos)
+	breakDurationMinutes Int       @default(5)  // duração da pausa (minutos)
+	customCategories     String    @default("Geral") // categorias criadas pelo responsável
+	childAgeGroup        String?   @default("10-11") // faixa etária da criança (ex: "0-9", "10-11", "12-13", "14-16")
+	blockedRatings       String?   @default("12,14,16,18") // classificações indicativas bloqueadas (L, 10, 12, 14, 16, 18)
+	createdAt            DateTime  @default(now())
+	lastSeenAt           DateTime?
+
+	blockedSites    BlockedSite[]
+	blockedKeywords BlockedKeyword[]
+	messages        Message[]
+	usageLogs       UsageLog[]
+}
+
+model BlockedSite {
+	id        Int      @id @default(autoincrement())
+	url       String
+	category  String   @default("Geral")
+	deviceId  Int
+	device    Device   @relation(fields: [deviceId], references: [id])
+	createdAt DateTime @default(now())
+}
+
+model BlockedKeyword {
+	id        Int      @id @default(autoincrement())
+	word      String
+	deviceId  Int
+	device    Device   @relation(fields: [deviceId], references: [id])
+	createdAt DateTime @default(now())
+}
+
+// Mensagem de aviso enviada pelo responsável para o dispositivo monitorado.
+model Message {
+	id        Int      @id @default(autoincrement())
+	content   String
+	deviceId  Int
+	device    Device   @relation(fields: [deviceId], references: [id])
+	delivered Boolean  @default(false)
+	createdAt DateTime @default(now())
+}
+
+// Um registro por domínio, por dia, por dispositivo — usado para montar
+// o "tempo de uso hoje" e o gráfico de "quantidade de acesso".
+model UsageLog {
+	id        Int      @id @default(autoincrement())
+	deviceId  Int
+	device    Device   @relation(fields: [deviceId], references: [id])
+	domain    String
+	seconds   Int      @default(0)
+	visits    Int      @default(0)
+	date      String // ex: "2026-09-13"
+	createdAt DateTime @default(now())
+
+	@@unique([deviceId, domain, date])
+}
